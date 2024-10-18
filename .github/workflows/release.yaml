@@ -11,7 +11,7 @@
         goreleaser:
             name: Build CLI
             permissions:
-                contents: read
+                contents: write
             runs-on: ubuntu-latest
             steps:
                 - name: Checkout
