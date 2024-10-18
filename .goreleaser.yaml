@@ -37,5 +37,5 @@ archives:
         format: zip
 
 changelog:
-  disable: true
+  disable: false
   use: github-native
