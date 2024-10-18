@@ -1,12 +1,69 @@
 ---
-    name: CI - release
+    name: Build and test components
     on:
-        push:
-            tags:
-                - 'v*'
-
+      pull_request:
+      push:
+        branches:
+          - main
+        tags:
+          - v*
     jobs:
+        goreleaser:
+            name: Build CLI
+            permissions:
+                contents: read
+            runs-on: ubuntu-latest
+            steps:
+                - name: Checkout
+                  uses: actions/checkout@v4
+                  with:
+                    fetch-depth: 0
+    
+                # Required for goreleaser cross-compilation
+                - name: Set up QEMU
+                  uses: docker/setup-qemu-action@v3
+    
+                - name: Set up Go
+                  uses: actions/setup-go@v5
+                  with:
+                    go-version: "^1.23"
+    
+                - name: Install Syft for sboms
+                  run: curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sudo sh -s -- -b /usr/local/bin
+                  shell: bash
+    
+                - name: Update the upx version
+                  run: |
+                    curl --silent -L https://github.com/upx/upx/releases/download/v4.1.0/upx-4.1.0-arm64_linux.tar.xz | tar -xJf - upx-4.1.0-arm64_linux/upx -O > upx
+                    sudo mv upx /bin/
+                    sudo chmod a+x /bin/upx
+                  shell: bash
+    
+                - name: Ignore dirty git state from operator injection
+                  run: echo "goreleaser-flags=--skip=validate" >> $GITHUB_ENV
+    
+                # Note snapshot removal in v4: https://github.com/caarlos0/goreleaser-action-v4-auto-snapshot-example
+                - name: Set up snapshot build
+                  if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+                  run: echo "goreleaser-flags=--snapshot" >> $GITHUB_ENV
+    
+                - name: Set up PR build for single Linux target only
+                  if: ${{ github.event_name == 'pull_request' }}
+                  run: echo 'goreleaser-flags=--skip=publish,sign,sbom --snapshot --single-target' >> $GITHUB_ENV
+    
+                - name: Run GoReleaser with flags
+                  uses: goreleaser/goreleaser-action@v6
+                  with:
+                    workdir: components/cli
+                    version: '~> v2'
+                    distribution: goreleaser-pro
+                    args: release --clean ${{ env.goreleaser-flags }}
+                  env:
+                    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
         releases:
+            needs:
+                - goreleaser
             name: Create release
             runs-on: ubuntu-latest
             permissions:
