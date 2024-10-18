@@ -54,9 +54,7 @@
                 - name: Run GoReleaser with flags
                   uses: goreleaser/goreleaser-action@v6
                   with:
-                    workdir: components/cli
                     version: '~> v2'
-                    distribution: goreleaser-pro
                     args: release --clean ${{ env.goreleaser-flags }}
                   env:
                     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
